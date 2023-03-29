@@ -48,8 +48,8 @@ class TemplateAgent(DefaultParty):
         self.settings: Settings = None
         self.storage_dir: str = None
 
-        self.last_received_bid: Bid = None
-        self.bid_before_last_received_bid: Bid = None
+        self.last_sent_bid: Bid = None
+
         self.opponent_model: OpponentModel = None
         self.logger.log(logging.INFO, "party is initialized")
 
@@ -173,6 +173,8 @@ class TemplateAgent(DefaultParty):
         else:
             # if not, propose a counter offer.
             action = Offer(self.me, bid)
+            # Save the last sent bid.
+            self.last_sent_bid = bid
 
         # send the action
         self.send_action(action)
@@ -217,9 +219,8 @@ class TemplateAgent(DefaultParty):
         domain = self.profile.getDomain()
         all_bids = AllBidsList(domain)
 
-        best_bid_score = 0.0
         best_bid = None
-
+        best_bid_score = 0.0
         # take 500 attempts to find a bid according to a heuristic score
         for _ in range(500):
             bid = all_bids.get(randint(0, all_bids.size() - 1))
