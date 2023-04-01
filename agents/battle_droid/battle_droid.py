@@ -27,10 +27,10 @@ from geniusweb.progress.ProgressTime import ProgressTime
 from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
-from .utils.opponent_model import OpponentModel
+from geniusweb.opponentmodel import FrequencyOpponentModel
+from.utils.opponent_model import OpponentModel
 
-
-class TemplateAgent(DefaultParty):
+class BattleDroid(DefaultParty):
     """
     Template of a Python geniusweb agent.
     """
