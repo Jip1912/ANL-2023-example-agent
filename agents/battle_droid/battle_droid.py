@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from random import randint
 from time import time
 from typing import cast
@@ -28,7 +29,6 @@ from geniusweb.references.Parameters import Parameters
 from tudelft_utilities_logging.ReportToLogger import ReportToLogger
 
 from geniusweb.opponentmodel import FrequencyOpponentModel
-from.utils.opponent_model import OpponentModel
 
 class BattleDroid(DefaultParty):
     """
@@ -47,10 +47,15 @@ class BattleDroid(DefaultParty):
         self.other: str = None
         self.settings: Settings = None
         self.storage_dir: str = None
+        self.bids: list = []
+        self.frequencies: list = []
+        self.issue_weights: list = []
+        self.value_tracker: list = []
+        
 
-        self.last_sent_bid: Bid = None
+        self.utility_last_received_bid: float = 1.0
+        self.utility_last_sent_bid: float = 1.0
 
-        self.opponent_model: OpponentModel = None
         self.logger.log(logging.INFO, "party is initialized")
 
     def notifyChange(self, data: Inform):
@@ -138,7 +143,7 @@ class BattleDroid(DefaultParty):
         Returns:
             str: Agent description
         """
-        return "Template agent for the ANL 2022 competition"
+        return "Battle Droid beep beep"
 
     def opponent_action(self, action):
         """Process an action that was received from the opponent.
@@ -149,33 +154,71 @@ class BattleDroid(DefaultParty):
         # if it is an offer, set the last received bid
         if isinstance(action, Offer):
             # create opponent model if it was not yet initialised
-            if self.opponent_model is None:
-                self.opponent_model = OpponentModel(self.domain)
+            # if self.opponent_model is None:
+            #     self.opponent_model = FrequencyOpponentModel.FrequencyOpponentModel.create()
 
-            bid = cast(Offer, action).getBid()
+            bid: Bid = cast(Offer, action).getBid()
 
-            # update opponent model with bid
-            self.opponent_model.update(bid)
             # set bid as last received
             self.last_received_bid = bid
+
+            # how many issues are there in the bid.
+            issues_length: int = len(self.last_received_bid.getIssues())
+            # the values for every issue.
+            issue_values: list = list(self.last_received_bid.getIssueValues().values())
+            self.bids.append(issue_values)
+
+            # initializes the values for the weights, the change of the value and the frequency.
+            if len(self.issue_weights) == 0:
+                for i in range(issues_length):
+                    self.issue_weights.append(1.0 / issues_length)
+                    self.value_tracker.append(1.0)
+                    self.frequencies.append({issue_values[i]: 1.0})
+
+            else:
+                # go through every issue in the received bid and update the frequency values.
+                for i in range(issues_length):
+                    issue_values_last_bid: list = list(self.last_received_bid.getIssueValues().values())[i]
+                    
+                    # if the values in the last received bid have changed with the bid before that,
+                    # then update the value changed to indicate it is less important.
+                    if self.bids[-1][i] != issue_values_last_bid:
+                        self.value_tracker[i] = self.value_tracker[i] * 2
+                    
+                    # update the weight of the issue.
+                    # if the change value of the issue is lower then the formula below produces a higher weight.
+                    change_total: int = sum(self.value_tracker)
+                    self.issue_weights[i] = (change_total - self.value_tracker[i]) / (change_total * (issues_length - 1)) 
+                    
+                    # if the issue values are not yet in the frequency matrix then set it to 1.
+                    # else increment it by 1.
+                    if issue_values_last_bid not in self.frequencies[i]:
+                        self.frequencies[i][issue_values_last_bid] = 1
+                    else:
+                        self.frequencies[i][issue_values_last_bid] += 1
+            
 
     def my_turn(self):
         """This method is called when it is our turn. It should decide upon an action
         to perform and send this action to the opponent.
         """
+        utility: float = 0
+        issues_length = len(self.last_received_bid.getIssues())
+        for i in range(issues_length):
+            utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
+        
         # Find a bid before the accept condition to compare the last received bid with our own next bid.
-        bid = self.find_bid()
+        bid: Bid = self.find_bid(utility)
 
         # check if the last received offer is good enough.
-        if self.accept_condition(self.last_received_bid, bid):
+        if self.accept_condition(self.last_received_bid):
             # if so, accept the offer
             action = Accept(self.me, self.last_received_bid)
         else:
             # if not, propose a counter offer.
             action = Offer(self.me, bid)
-            # Save the last sent bid.
-            self.last_sent_bid = bid
 
+        self.utility_last_received_bid = utility
         # send the action
         self.send_action(action)
 
@@ -188,71 +231,61 @@ class BattleDroid(DefaultParty):
         with open(f"{self.storage_dir}/data.md", "w") as f:
             f.write(data)
 
-    ###########################################################################################
-    ################################## Example methods below ##################################
-    ###########################################################################################
-
-    def accept_condition(self, last_received_bid: Bid, our_next_bid: Bid) -> bool:
-        if last_received_bid is None:
+    def accept_condition(self, bid: Bid) -> bool:
+        if bid is None:
             return False
-        
-        accept = False
         # progress of the negotiation session between 0 and 1 (1 is deadline)
-        progress = self.progress.get(time() * 1000)
-    
-        # Check if Utility of the last received bid is higher than our next proposed bid would be.
-        if self.profile.getUtility(last_received_bid) > self.profile.getUtility(our_next_bid):
-            accept = True
+        progress: float = self.progress.get(time() * 1000)
+
+
+        if self.profile.getReservationBid() is None:
+            reservation = 0.0
         else:
-            # very basic approach that accepts if the offer is valued above 0.7 and
-            # 95% of the time towards the deadline has passed
-            conditions = [
-                self.profile.getUtility(last_received_bid) > 0.8,
-                progress > 0.95,
-            ]
-            accept = all(conditions)
+            reservation = self.profile.getUtility(self.profile.getReservationBid())
 
-        return accept
+        if self.profile.getUtility(bid) >= 0.99:
+            return True
+        
+        beta = 0.000000001  # beta: small = boulware, large = conceder, 0.5 = linear
+        k = 0.9
+        a = k + (1.0 - k) * pow(progress, (1.0 / beta))
+        min1 = 0.8
+        max1 = 1.0
+        utility = min1 + (1.0 - a) * (max1 - min1)
+        if self.profile.getUtility(bid) >= utility:
+            return True
 
-    def find_bid(self) -> Bid:
+        # very basic approach that accepts if the offer is valued above the reservation value and
+        # 99% of the time towards the deadline has passed
+        conditions = [
+            self.profile.getUtility(bid) > reservation,
+            progress >= 0.99,
+        ]
+        
+        return all(conditions)
+
+    def find_bid(self, utility: float) -> Bid:
         # compose a list of all possible bids
         domain = self.profile.getDomain()
         all_bids = AllBidsList(domain)
+        
+        changed_utility: float = self.utility_last_received_bid - utility
 
-        best_bid = None
-        best_bid_score = 0.0
-        # take 500 attempts to find a bid according to a heuristic score
-        for _ in range(500):
+        bid_found: bool = False
+        for _ in range(5000):
             bid = all_bids.get(randint(0, all_bids.size() - 1))
-            bid_score = self.score_bid(bid)
-            if bid_score > best_bid_score:
-                best_bid_score, best_bid = bid_score, bid
-
-        return best_bid
-
-    def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
-        """Calculate heuristic score for a bid
-
-        Args:
-            bid (Bid): Bid to score
-            alpha (float, optional): Trade-off factor between self interested and
-                altruistic behaviour. Defaults to 0.95.
-            eps (float, optional): Time pressure factor, balances between conceding
-                and Boulware behaviour over time. Defaults to 0.1.
-
-        Returns:
-            float: score
-        """
-        progress = self.progress.get(time() * 1000)
-
-        our_utility = float(self.profile.getUtility(bid))
-
-        time_pressure = 1.0 - progress ** (1 / eps)
-        score = alpha * time_pressure * our_utility
-
-        if self.opponent_model is not None:
-            opponent_utility = self.opponent_model.get_predicted_utility(bid)
-            opponent_score = (1.0 - alpha * time_pressure) * opponent_utility
-            score += opponent_score
-
-        return score
+            conditions = [
+                -0.2 < Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) - (Decimal(changed_utility) * Decimal(0.3)) < 0.05,
+                Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) < 0.1
+            ]
+            if all(conditions):
+                bid_found = True
+                break
+        if not bid_found:
+            for _ in range(5000):
+                bid = all_bids.get(randint(0, all_bids.size() - 1))
+                if self.utility_last_sent_bid < 0.1:
+                    break
+            
+        self.utility_last_sent_bid = self.profile.getUtility(bid)
+        return bid
