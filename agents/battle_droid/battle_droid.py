@@ -51,8 +51,8 @@ class BattleDroid(DefaultParty):
         self.frequencies: list = []
         self.issue_weights: list = []
         self.value_tracker: list = []
+        self.last_received_bid: Bid = None
         
-
         self.utility_last_received_bid: float = 1.0
         self.utility_last_sent_bid: float = 1.0
 
@@ -201,8 +201,12 @@ class BattleDroid(DefaultParty):
 
         # calculates the utility of the last received bid.
         utility: float = 0
-        for i in range(len(self.last_received_bid.getIssues())):
-            utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
+        
+        if not self.last_received_bid:
+            utility = 0.95
+        else:
+            for i in range(len(self.last_received_bid.getIssues())):
+                utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
         
         # Find a bid before the accept condition to compare the last received bid with our own next bid.
         bid: Bid = self.find_bid(utility)
@@ -244,14 +248,22 @@ class BattleDroid(DefaultParty):
             return True
         
         # "The family of curves with beta > 1 are called Boulware, whereas beta < 1 are termed Conceder"
-        beta: float = 0.000000001
-        x_0: float = 0.9
-        g_r: float = x_0 + (1.0 - x_0) * pow(progress, (1.0 / beta))
-        x_min: float = 0.8
-        x_max: float = 1.0
-        utility_x: float = x_min + (1.0 - g_r) * (x_max - x_min)
-        if self.profile.getUtility(bid) >= utility_x:
+        # Source for formula: https://web.fe.up.pt/~eol/schaefer/diplom/TacticsAndStrategies.htm
+        beta: float = 0.001
+        k: float = 0.18
+        utility: float = k + (1-k) * pow(progress, 1/beta)
+        if self.profile.getUtility(bid) >= 1 - utility:
             return True
+        
+        # Old code
+        # beta: float = 0.000000001
+        # x_0: float = 0.9
+        # g_r: float = x_0 + (1.0 - x_0) * pow(progress, (1.0 / beta))
+        # x_min: float = 0.8
+        # x_max: float = 1.0
+        # utility_x: float = x_min + (1.0 - g_r) * (x_max - x_min)
+        # if self.profile.getUtility(bid) >= utility_x:
+        #     return True
 
         # very basic approach that accepts if the offer is valued above the reservation value and
         # 99% of the time towards the deadline has passed

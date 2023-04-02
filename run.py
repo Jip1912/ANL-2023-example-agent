@@ -18,12 +18,12 @@ if not RESULTS_DIR.exists():
 settings = {
     "agents": [
         {
-            "class": "agents.ANL2022.dreamteam109_agent.dreamteam109_agent.DreamTeam109Agent",
-            "parameters": {"storage_dir": "agent_storage/DreamTeam109Agent"},
-        },
-        {
             "class": "agents.battle_droid.battle_droid.BattleDroid",
             "parameters": {"storage_dir": "agent_storage/BattleDroidAgent"},
+        },
+        {
+            "class": "agents.ANL2022.dreamteam109_agent.dreamteam109_agent.DreamTeam109Agent",
+            "parameters": {"storage_dir": "agent_storage/.DreamTeam109Agent"},
         },
     ],
     "profiles": ["domains/domain00/profileA.json", "domains/domain00/profileB.json"],
@@ -31,7 +31,18 @@ settings = {
 }
 
 # run a session and obtain results in dictionaries
-session_results_trace, session_results_summary = run_session(settings)
+amount_of_wins = 0
+rounds = 5
+for i in range(1, rounds * 2, 2):
+    first_agent = i
+    second_agent = i + 1
+    session_results_trace, session_results_summary = run_session(settings)
+    won = session_results_summary['result'] == 'agreement' and session_results_summary['utility_' + str(first_agent)] > session_results_summary['utility_' +  str(second_agent)]
+    print("\n-------------------------\nWon: ", won, "\n-------------------------\n")
+    if won:
+        amount_of_wins += 1
+print("\n-------------------------\nWIN PERCENTAGE: ", amount_of_wins/rounds * 100, "%\n-------------------------\n")
+
 
 # plot trace to html file
 if not session_results_trace["error"]:
