@@ -47,10 +47,10 @@ class BattleDroid(DefaultParty):
         self.other: str = None
         self.settings: Settings = None
         self.storage_dir: str = None
-        self.bids: list = []
-        self.frequencies: list = []
+        self.bid_history: list = []
+        self.value_frequencies: list = []
         self.issue_weights: list = []
-        self.value_tracker: list = []
+        self.issue_change_counter: list = []
         
 
         self.utility_last_received_bid: float = 1.0
@@ -151,47 +151,43 @@ class BattleDroid(DefaultParty):
         Args:
             action (Action): action of opponent
         """
-        # if it is an offer, set the last received bid
         if isinstance(action, Offer):
             bid: Bid = cast(Offer, action).getBid()
 
-            # set bid as last received
+            # Set bid as last received
             self.last_received_bid = bid
 
-            # how many issues are there in the bid.
+            # How many issues are there in the bid.
             issues_length: int = len(self.last_received_bid.getIssues())
-            # the values for every issue.
+            # The values for every issue.
             issue_values: list = list(self.last_received_bid.getIssueValues().values())
-            self.bids.append(issue_values)
+            self.bid_history.append(issue_values)
 
-            # initializes the values for the weights, the change of the value and the frequency.
-            if len(self.issue_weights) == 0:
+            # Initializes the values for the issue weights, the value tracker and the frequency of the issue.
+            if not self.issue_weights:
                 for i in range(issues_length):
+                    # 1.0 / amount of issues to set it to an even division.
                     self.issue_weights.append(1.0 / issues_length)
-                    self.value_tracker.append(1.0)
-                    self.frequencies.append({issue_values[i]: 1.0})
+                    # Set how often an issue has changed to 1.0.
+                    self.issue_change_counter.append(1.0)
+                    # Set the frequencies of the issue values to 1.0.
+                    self.value_frequencies.append({issue_values[i]: 1.0})
 
             else:
                 # go through every issue in the received bid and update the frequency values.
-                for i in range(issues_length):
-                    issue_values_last_bid: list = list(self.last_received_bid.getIssueValues().values())[i]
-                    
-                    # if the values in the last received bid have changed with the bid before that,
-                    # then update the value changed to indicate it is less important.
-                    if self.bids[-1][i] != issue_values_last_bid:
-                        self.value_tracker[i] = self.value_tracker[i] * 2
-                    
-                    # update the weight of the issue.
-                    # if the change value of the issue is lower then the formula below produces a higher weight.
-                    change_total: int = sum(self.value_tracker)
-                    self.issue_weights[i] = (change_total - self.value_tracker[i]) / (change_total * (issues_length - 1)) 
-                    
-                    # if the issue values are not yet in the frequency matrix then set it to 1.
-                    # else increment it by 1.
-                    if issue_values_last_bid not in self.frequencies[i]:
-                        self.frequencies[i][issue_values_last_bid] = 1
-                    else:
-                        self.frequencies[i][issue_values_last_bid] += 1
+                for i, issue_values_last_bid in enumerate(self.last_received_bid.getIssueValues().values()):
+                    # If the values in the last received bid have changed with the previous bid, indicate it is less important
+                    if self.bid_history[-1][i] != issue_values_last_bid:
+                        self.issue_change_counter[i] *= 2
+        
+                    # Update the weight of the issue
+                    change_total = sum(self.issue_change_counter)
+                    issue_weight_sum = change_total - self.issue_change_counter[i]
+                    issue_weight_denominator = change_total * (len(self.last_received_bid.getIssueValues()) - 1)
+                    self.issue_weights[i] = issue_weight_sum / issue_weight_denominator
+    
+                    # Increment the frequency of the issue values
+                    self.value_frequencies[i][issue_values_last_bid] = self.value_frequencies[i].get(issue_values_last_bid, 0) + 1
             
 
     def my_turn(self):
@@ -202,7 +198,7 @@ class BattleDroid(DefaultParty):
         # calculates the utility of the last received bid.
         utility: float = 0
         for i in range(len(self.last_received_bid.getIssues())):
-            utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
+            utility += self.issue_weights[i] * (self.value_frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.value_frequencies[i].values()))
         
         # Find a bid before the accept condition to compare the last received bid with our own next bid.
         bid: Bid = self.find_bid(utility)
