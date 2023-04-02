@@ -243,13 +243,14 @@ class BattleDroid(DefaultParty):
         if self.profile.getUtility(bid) >= 0.99:
             return True
         
-        beta = 0.000000001  # beta: small = boulware, large = conceder, 0.5 = linear
-        k = 0.9
-        a = k + (1.0 - k) * pow(progress, (1.0 / beta))
-        min1 = 0.8
-        max1 = 1.0
-        utility = min1 + (1.0 - a) * (max1 - min1)
-        if self.profile.getUtility(bid) >= utility:
+        # "The family of curves with beta > 1 are called Boulware, whereas beta < 1 are termed Conceder"
+        beta: float = 0.000000001
+        x_0: float = 0.9
+        g_r: float = x_0 + (1.0 - x_0) * pow(progress, (1.0 / beta))
+        x_min: float = 0.8
+        x_max: float = 1.0
+        utility_x: float = x_min + (1.0 - g_r) * (x_max - x_min)
+        if self.profile.getUtility(bid) >= utility_x:
             return True
 
         # very basic approach that accepts if the offer is valued above the reservation value and
@@ -271,12 +272,8 @@ class BattleDroid(DefaultParty):
         # Get all possible bids
         all_bids = AllBidsList(domain)
         
-<<<<<<< HEAD
-        difference_utility: float = self.utility_last_received_bid - utility
-=======
         # Calculate the difference between the last received bid utility and the current utility
         diff_received_utility: float = self.utility_last_received_bid - utility
->>>>>>> 2b14ccee86975071bfc2fc57caf4a8fb9dc6e018
 
         for _ in range(5000):
             # Choose a random bid
@@ -285,11 +282,7 @@ class BattleDroid(DefaultParty):
             diff_sent_utility = Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid)
             # Check if the conditions for a valid bid are met
             conditions = [
-<<<<<<< HEAD
-                -0.2 < Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) - (Decimal(difference_utility) * Decimal(0.3)) < 0.05,
-=======
                 -0.2 < diff_sent_utility  - (Decimal(diff_received_utility) * Decimal(0.3)) < 0.05,
->>>>>>> 2b14ccee86975071bfc2fc57caf4a8fb9dc6e018
                 Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) < 0.1
             ]
             if all(conditions):
