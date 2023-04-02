@@ -153,10 +153,6 @@ class BattleDroid(DefaultParty):
         """
         # if it is an offer, set the last received bid
         if isinstance(action, Offer):
-            # create opponent model if it was not yet initialised
-            # if self.opponent_model is None:
-            #     self.opponent_model = FrequencyOpponentModel.FrequencyOpponentModel.create()
-
             bid: Bid = cast(Offer, action).getBid()
 
             # set bid as last received
@@ -202,9 +198,10 @@ class BattleDroid(DefaultParty):
         """This method is called when it is our turn. It should decide upon an action
         to perform and send this action to the opponent.
         """
+
+        # calculates the utility of the last received bid.
         utility: float = 0
-        issues_length = len(self.last_received_bid.getIssues())
-        for i in range(issues_length):
+        for i in range(len(self.last_received_bid.getIssues())):
             utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
         
         # Find a bid before the accept condition to compare the last received bid with our own next bid.
@@ -269,13 +266,13 @@ class BattleDroid(DefaultParty):
         domain = self.profile.getDomain()
         all_bids = AllBidsList(domain)
         
-        changed_utility: float = self.utility_last_received_bid - utility
+        difference_utility: float = self.utility_last_received_bid - utility
 
         bid_found: bool = False
         for _ in range(5000):
             bid = all_bids.get(randint(0, all_bids.size() - 1))
             conditions = [
-                -0.2 < Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) - (Decimal(changed_utility) * Decimal(0.3)) < 0.05,
+                -0.2 < Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) - (Decimal(difference_utility) * Decimal(0.3)) < 0.05,
                 Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) < 0.1
             ]
             if all(conditions):
