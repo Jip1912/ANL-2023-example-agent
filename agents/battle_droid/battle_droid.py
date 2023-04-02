@@ -262,27 +262,51 @@ class BattleDroid(DefaultParty):
         return all(conditions)
 
     def find_bid(self, utility: float) -> Bid:
-        # compose a list of all possible bids
+        """This method is called when its our turn. We use the returned value to compare it with
+        the last received bid and then either accept the receid bid or send this bid. We use a 
+        tit-for-tat strategy.
+        """
+        # Compose a list of all possible bids
         domain = self.profile.getDomain()
+        # Get all possible bids
         all_bids = AllBidsList(domain)
         
+<<<<<<< HEAD
         difference_utility: float = self.utility_last_received_bid - utility
+=======
+        # Calculate the difference between the last received bid utility and the current utility
+        diff_received_utility: float = self.utility_last_received_bid - utility
+>>>>>>> 2b14ccee86975071bfc2fc57caf4a8fb9dc6e018
 
-        bid_found: bool = False
         for _ in range(5000):
+            # Choose a random bid
             bid = all_bids.get(randint(0, all_bids.size() - 1))
+            # Calculate the difference between the last sent bid utility and current bid utility
+            diff_sent_utility = Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid)
+            # Check if the conditions for a valid bid are met
             conditions = [
+<<<<<<< HEAD
                 -0.2 < Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) - (Decimal(difference_utility) * Decimal(0.3)) < 0.05,
+=======
+                -0.2 < diff_sent_utility  - (Decimal(diff_received_utility) * Decimal(0.3)) < 0.05,
+>>>>>>> 2b14ccee86975071bfc2fc57caf4a8fb9dc6e018
                 Decimal(self.utility_last_sent_bid) - self.profile.getUtility(bid) < 0.1
             ]
             if all(conditions):
-                bid_found = True
-                break
-        if not bid_found:
-            for _ in range(5000):
-                bid = all_bids.get(randint(0, all_bids.size() - 1))
-                if self.utility_last_sent_bid < 0.1:
-                    break
+                # If all conditions are met, return the bid
+                self.utility_last_sent_bid = self.profile.getUtility(bid)
+                return bid
+        
+        # If no valid bid is found, loop through possible bids again
+        for _ in range(5000):
+            # Choose a random bid
+            bid = all_bids.get(randint(0, all_bids.size() - 1))
+            # Check if the new bid utility is close to or better than the last sent bid utility
+            if self.utility_last_sent_bid - self.profile.getUtility(bid) < 0.1:
+                self.utility_last_sent_bid = self.profile.getUtility(bid)
+                return bid
             
+        # If no valid bid is found, choose a random bid
+        bid = all_bids.get(randint(0, all_bids.size() - 1))
         self.utility_last_sent_bid = self.profile.getUtility(bid)
         return bid
