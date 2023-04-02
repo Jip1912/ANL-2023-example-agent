@@ -265,6 +265,10 @@ class BattleDroid(DefaultParty):
         return all(conditions)
 
     def find_bid(self, utility: float) -> Bid:
+        """This method is called when its our turn. We use the returned value to compare it with
+        the last received bid and then either accept the receid bid or send this bid. We use a 
+        tit-for-tat strategy.
+        """
         # Compose a list of all possible bids
         domain = self.profile.getDomain()
         # Get all possible bids
