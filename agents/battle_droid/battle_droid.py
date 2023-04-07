@@ -236,7 +236,7 @@ class BattleDroid(DefaultParty):
 
 
         if self.profile.getReservationBid() is None:
-            reservation = 0.0
+            reservation = 0.7
         else:
             reservation = self.profile.getUtility(self.profile.getReservationBid())
 

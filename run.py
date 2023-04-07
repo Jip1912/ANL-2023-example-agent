@@ -33,16 +33,18 @@ settings = {
 # run a session and obtain results in dictionaries
 amount_of_wins = 0
 rounds = 5
+utility_sum = 0
 for i in range(1, rounds * 2, 2):
     first_agent = i
     second_agent = i + 1
     session_results_trace, session_results_summary = run_session(settings)
+    utility_sum += session_results_summary['utility_' + str(first_agent)]
     won = session_results_summary['result'] == 'agreement' and session_results_summary['utility_' + str(first_agent)] > session_results_summary['utility_' +  str(second_agent)]
     print("\n-------------------------\nWon: ", won, "\n-------------------------\n")
     if won:
         amount_of_wins += 1
 print("\n-------------------------\nWIN PERCENTAGE: ", amount_of_wins/rounds * 100, "%\n-------------------------\n")
-
+print("\n-------------------------\nAVERAGE UTILITY: ", round(utility_sum/rounds,2), "\n-------------------------\n")
 
 # plot trace to html file
 if not session_results_trace["error"]:
