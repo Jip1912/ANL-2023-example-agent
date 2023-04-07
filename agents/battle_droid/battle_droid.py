@@ -245,7 +245,8 @@ class BattleDroid(DefaultParty):
         
         # "The family of curves with beta > 1 are called Boulware, whereas beta < 1 are termed Conceder"
         # Source for formula: https://web.fe.up.pt/~eol/schaefer/diplom/TacticsAndStrategies.htm
-        beta: float = 0.001
+        
+        beta: float = 0.005
         k: float = 0.18
         utility: float = k + (1-k) * pow(progress, 1/beta)
         if self.profile.getUtility(bid) >= 1 - utility:
