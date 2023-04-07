@@ -202,7 +202,7 @@ class BattleDroid(DefaultParty):
             utility = 0.95
         else:
             for i in range(len(self.last_received_bid.getIssues())):
-                utility += self.issue_weights[i] * (self.frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.frequencies[i].values()))
+                utility += self.issue_weights[i] * (self.value_frequencies[i][list(self.last_received_bid.getIssueValues().values())[i]] / sum(self.value_frequencies[i].values()))
         
         # Find a bid before the accept condition to compare the last received bid with our own next bid.
         bid: Bid = self.find_bid(utility)
